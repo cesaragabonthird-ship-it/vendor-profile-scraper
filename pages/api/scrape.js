@@ -81,7 +81,7 @@ Return this EXACT JSON structure (and NOTHING else):
   "companyName": "The business name or null",
   "headline": "A short description (max 100 chars) or null. If possible, use gerund form like 'Providing...'",
   "website": "${url}",
-  "about": "Company description/about text or null",
+  "about": "Company description/about/who we are text or null",
   "address": "Full address (prioritize headquarters/main office) or null",
   "phone": "Phone number or null",
   "email": "Email address or null",
@@ -106,9 +106,9 @@ Return this EXACT JSON structure (and NOTHING else):
 
 IMPORTANT EXTRACTION RULES:
 - Projects: Extract EVERY project mentioned (minimum 2 if available)
-- Locations: Extract specific cities AND broader service areas (Northeast, Northern California, etc.)
+- Locations: Extract specific cities AND broader service areas (Northeast, Northern California, or Nationwide etc.)
 - Address: Prioritize headquarters or main office address
-- About: Include the full company description if available
+- About: Include the full company description if available and services in bullet form.
 - Type of Work: Infer from company name and description if not explicitly stated
 - Photos: Only include actual image URLs, not placeholder text`;
 
