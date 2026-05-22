@@ -57,28 +57,29 @@ export default async function handler(req, res) {
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
       .replace(/\s+/g, ' ')
       .trim()
-      .substring(0, 15000); // Limit to 15000 chars
+      .substring(0, 20000); // Increased limit for better extraction
 
     console.log(`[SCRAPER] Cleaned HTML: ${cleanHtml.length} chars`);
 
-    // Create extraction prompt
-    const extractionPrompt = `You are a data extraction expert. Extract contractor profile information from this website.
+    // Create advanced extraction prompt
+    const extractionPrompt = `You are an expert data extraction specialist. Extract COMPREHENSIVE contractor/vendor profile information from this website.
 
 Website URL: ${url}
 
 Website Content:
 ${cleanHtml}
 
-IMPORTANT RULES:
+CRITICAL RULES:
 1. Extract ONLY information that actually exists in the content
 2. Do NOT invent, guess, or infer any data
-3. Return ONLY valid JSON - no markdown, no code blocks, no extra text
-4. If a field has no data, use null
+3. Extract ALL projects mentioned (not just one!)
+4. Extract ALL operating locations and service areas
+5. Return ONLY valid JSON - no markdown, no code blocks, no extra text
 
-Return this exact JSON structure (and ONLY this JSON, nothing else):
+Return this EXACT JSON structure (and NOTHING else):
 {
   "companyName": "The business name or null",
-  "headline": "A short description (max 100 chars) or null. If possible, use gerund form like 'Providing...' or 'Offering...'",
+  "headline": "A short description (max 100 chars) or null. If possible, use gerund form like 'Providing...'",
   "website": "${url}",
   "about": "Company description/about text or null",
   "address": "Full address (prioritize headquarters/main office) or null",
@@ -96,17 +97,26 @@ Return this exact JSON structure (and ONLY this JSON, nothing else):
     {
       "name": "Project name",
       "location": "City, State",
-      "description": "What the project was",
+      "description": "What the project was about",
+      "type": "Type of work (e.g., renovation, construction, etc.)",
       "photos": ["photo_url1", "photo_url2"]
     }
   ]
-}`;
+}
+
+IMPORTANT EXTRACTION RULES:
+- Projects: Extract EVERY project mentioned (minimum 2 if available)
+- Locations: Extract specific cities AND broader service areas (Northeast, Northern California, etc.)
+- Address: Prioritize headquarters or main office address
+- About: Include the full company description if available
+- Type of Work: Infer from company name and description if not explicitly stated
+- Photos: Only include actual image URLs, not placeholder text`;
 
     // Call Claude API
     console.log('[SCRAPER] Calling Claude API...');
     const message = await client.messages.create({
       model: 'claude-opus-4-6',
-      max_tokens: 2000,
+      max_tokens: 4000,
       messages: [
         {
           role: 'user',
@@ -137,6 +147,7 @@ Return this exact JSON structure (and ONLY this JSON, nothing else):
     try {
       profileData = JSON.parse(jsonText);
       console.log('[SCRAPER] Successfully parsed JSON');
+      console.log(`[SCRAPER] Projects: ${profileData.projects?.length || 0}, Locations: ${profileData.operatingLocations?.length || 0}`);
     } catch (parseError) {
       console.error('[SCRAPER] JSON parse error:', parseError.message);
       console.error('[SCRAPER] Raw text:', jsonText.substring(0, 500));
@@ -145,6 +156,9 @@ Return this exact JSON structure (and ONLY this JSON, nothing else):
         rawResponse: jsonText.substring(0, 500)
       });
     }
+
+    // Enhance and validate data
+    profileData = enhanceProfileData(profileData);
 
     return res.status(200).json({
       success: true,
@@ -158,4 +172,48 @@ Return this exact JSON structure (and ONLY this JSON, nothing else):
       type: error.constructor.name
     });
   }
+}
+
+/**
+ * Enhance profile data with additional processing
+ */
+function enhanceProfileData(data) {
+  // Ensure arrays exist
+  if (!data.projects) data.projects = [];
+  if (!data.operatingLocations) data.operatingLocations = [];
+
+  // Ensure we have at least basic location info
+  if (data.operatingLocations.length === 0 && data.address) {
+    const addressParts = data.address.split(',');
+    if (addressParts.length >= 2) {
+      const city = addressParts[0].trim();
+      const state = addressParts[addressParts.length - 1].trim();
+      data.operatingLocations.push({
+        type: 'city_state',
+        value: `${city}, ${state}`,
+        keywords: ['headquarters']
+      });
+    }
+  }
+
+  // Ensure all projects have required fields
+  data.projects = data.projects.map(project => ({
+    name: project.name || 'Unnamed Project',
+    location: project.location || 'Location not specified',
+    description: project.description || '',
+    type: project.type || 'General Work',
+    photos: Array.isArray(project.photos) ? project.photos.filter(p => p) : []
+  }));
+
+  // Limit to 5 projects for form filling
+  if (data.projects.length > 5) {
+    data.projects = data.projects.slice(0, 5);
+  }
+
+  // Limit to 10 locations
+  if (data.operatingLocations.length > 10) {
+    data.operatingLocations = data.operatingLocations.slice(0, 10);
+  }
+
+  return data;
 }
