@@ -113,7 +113,7 @@ Return this EXACT JSON:
 }
 
 EXTRACTION TIPS:
-- Employee count: Look for "X employees", "team of Y", "Z staff members" Our team, our staff
+- Employee count: Look for "X employees", "team of Y", "Z staff members" Our team, our staff, if none mentioned, use less than 20
 - Projects: Extract ALL mentioned (minimum 2 if available), can be case studies, in blogs or as long as they provided serives
 - Locations: Extract cities AND regions
 - Type: Infer from description if not explicit`;
