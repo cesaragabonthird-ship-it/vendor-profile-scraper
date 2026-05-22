@@ -39,8 +39,16 @@ export default async function handler(req, res) {
     const pagesToTry = [
       '/about',
       '/about-us',
+      '/why-us',
+      '/who-we-are',
+      '/our-staff',
+      '/staff',
+      '/our-team',
       '/team',
       '/services',
+      '/our-services',
+      '/what-we-do',
+      '/what-we-offer',
       '/projects',
       '/portfolio',
       '/work',
@@ -81,14 +89,15 @@ CRITICAL RULES:
 2. Do NOT invent data
 3. Extract ALL projects, locations, and employee info
 4. For company size: Look for employee count, team size, "employees", "staff", "team members"
-5. Return ONLY valid JSON - no markdown, no code blocks
+5. Company profile should be in Paragraph form if possible 2-3 paragraphs then the Services bullet form after
+6. Return ONLY valid JSON - no markdown, no code blocks
 
 Return this EXACT JSON:
 {
   "companyName": "Business name or null",
   "headline": "Current headline, Short description max 100 chars (gerund form preferred and rephrase if possible) or null",
   "website": "${url}",
-  "about": "Full company description/about/who we are + Our Services:/What We Offer:/What We Do bullet form after the full company description or null",
+  "about": "Full paragraph of company description/about/who we are + Our Services:/What We Offer:/What We Do bullet form after the full company description or null",
   "address": "Full headquarters address or null",
   "phone": "Phone number or null",
   "email": "Email address or null",
