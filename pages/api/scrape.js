@@ -88,7 +88,7 @@ Return this EXACT JSON:
   "companyName": "Business name or null",
   "headline": "Current headline, Short description max 100 chars (gerund form preferred and rephrase if possible) or null",
   "website": "${url}",
-  "about": "Full company description/about/who we are with services/what we offer/what we do in bullet form or null",
+  "about": "Full company description/about/who we are + Our Services:/What We Offer:/What We Do bullet form after the full company description or null",
   "address": "Full headquarters address or null",
   "phone": "Phone number or null (format: (123) 456-7890)",
   "email": "Email address or null",
