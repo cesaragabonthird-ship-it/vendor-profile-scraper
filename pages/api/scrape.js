@@ -90,7 +90,7 @@ Return this EXACT JSON:
   "website": "${url}",
   "about": "Full company description/about/who we are + Our Services:/What We Offer:/What We Do bullet form after the full company description or null",
   "address": "Full headquarters address or null",
-  "phone": "Phone number or null (format: (123) 456-7890)",
+  "phone": "Phone number or null",
   "email": "Email address or null",
   "companySize": "One of: 'Less than 20', '21-50', '51-200', '201-1000', 'More than 1000' or null - EXTRACT FROM EMPLOYEE COUNT IF MENTIONED",
   "employeeCount": "Exact number if mentioned (e.g., '45 employees', '120 team members') or null",
