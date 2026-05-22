@@ -5,7 +5,6 @@ const client = new Anthropic({
 });
 
 export default async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -25,95 +24,101 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log(`[SCRAPER] Starting scrape of: ${url}`);
+    console.log(`[SCRAPER] Starting multi-page scrape of: ${url}`);
 
-    // Fetch website content
-    let html = '';
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        timeout: 10000
-      });
+    // Step 1: Scrape homepage
+    let allContent = '';
+    const baseUrl = new URL(url);
+    const domain = baseUrl.origin;
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+    console.log('[SCRAPER] Scraping homepage...');
+    const homeContent = await fetchAndClean(url);
+    allContent += homeContent;
+
+    // Step 2: Try to scrape related pages
+    const pagesToTry = [
+      '/about',
+      '/about-us',
+      '/team',
+      '/services',
+      '/projects',
+      '/portfolio',
+      '/work',
+      '/case-studies',
+      '/company',
+      '/contact'
+    ];
+
+    for (const path of pagesToTry) {
+      try {
+        const pageUrl = domain + path;
+        console.log(`[SCRAPER] Trying to scrape ${path}...`);
+        const pageContent = await fetchAndClean(pageUrl);
+        if (pageContent && pageContent.length > 100) {
+          allContent += ' ' + pageContent;
+          console.log(`[SCRAPER] Successfully scraped ${path}`);
+        }
+      } catch (error) {
+        console.log(`[SCRAPER] Could not scrape ${path}: ${error.message}`);
+        // Continue to next page
       }
-
-      html = await response.text();
-      console.log(`[SCRAPER] Fetched ${html.length} bytes`);
-    } catch (fetchError) {
-      console.error('[SCRAPER] Fetch failed:', fetchError.message);
-      return res.status(400).json({
-        error: 'Failed to fetch website',
-        details: fetchError.message
-      });
     }
 
-    // Clean HTML
-    const cleanHtml = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 20000); // Increased limit for better extraction
+    // Limit total content
+    allContent = allContent.substring(0, 30000);
+    console.log(`[SCRAPER] Total content: ${allContent.length} chars from multiple pages`);
 
-    console.log(`[SCRAPER] Cleaned HTML: ${cleanHtml.length} chars`);
-
-    // Create advanced extraction prompt
-    const extractionPrompt = `You are an expert data extraction specialist. Extract COMPREHENSIVE contractor/vendor profile information from this website.
+    // Step 3: Extract data with advanced prompt
+    const extractionPrompt = `You are an expert data extraction specialist. Extract COMPREHENSIVE contractor/vendor information from this multi-page website content.
 
 Website URL: ${url}
 
-Website Content:
-${cleanHtml}
+Website Content (from homepage + multiple pages):
+${allContent}
 
 CRITICAL RULES:
-1. Extract ONLY information that actually exists in the content
-2. Do NOT invent, guess, or infer any data
-3. Extract ALL projects mentioned (not just one!)
-4. Extract ALL operating locations and service areas
-5. Return ONLY valid JSON - no markdown, no code blocks, no extra text
+1. Extract ONLY information that exists in the content
+2. Do NOT invent data
+3. Extract ALL projects, locations, and employee info
+4. For company size: Look for employee count, team size, "employees", "staff", "team members"
+5. Return ONLY valid JSON - no markdown, no code blocks
 
-Return this EXACT JSON structure (and NOTHING else):
+Return this EXACT JSON:
 {
-  "companyName": "The business name or null",
-  "headline": "A short description (max 100 chars) or null. If possible, use gerund form like 'Providing...'",
+  "companyName": "Business name or null",
+  "headline": "Current headline, Short description max 100 chars (gerund form preferred and rephrase if possible) or null",
   "website": "${url}",
-  "about": "Company description/about/who we are text or null",
-  "address": "Full address (prioritize headquarters/main office) or null",
-  "phone": "Phone number or null",
+  "about": "Full company description/about/who we are with services/what we offer/what we do in bullet form or null",
+  "address": "Full headquarters address or null",
+  "phone": "Phone number or null (format: (123) 456-7890)",
   "email": "Email address or null",
-  "companySize": "One of: 'Less than 20', '21-50', '51-200', '201-1000', 'More than 1000', or null",
+  "companySize": "One of: 'Less than 20', '21-50', '51-200', '201-1000', 'More than 1000' or null - EXTRACT FROM EMPLOYEE COUNT IF MENTIONED",
+  "employeeCount": "Exact number if mentioned (e.g., '45 employees', '120 team members') or null",
   "operatingLocations": [
     {
       "type": "city_state or region",
       "value": "City, State or Region Name",
-      "keywords": ["related keywords found"]
+      "keywords": ["keywords"]
     }
   ],
   "projects": [
     {
       "name": "Project name",
       "location": "City, State",
-      "description": "What the project was about",
-      "type": "Type of work (e.g., renovation, construction, etc.)",
-      "photos": ["photo_url1", "photo_url2"]
+      "description": "What it was about",
+      "type": "Type of work",
+      "photos": ["urls"]
     }
   ]
 }
 
-IMPORTANT EXTRACTION RULES:
-- Projects: Extract EVERY project mentioned (minimum 2 if available)
-- Locations: Extract specific cities AND broader service areas (Northeast, Northern California, or Nationwide etc.)
-- Address: Prioritize headquarters or main office address
-- About: Include the full company description if available and services in bullet form.
-- Type of Work: Infer from company name and description if not explicitly stated
-- Photos: Only include actual image URLs, not placeholder text`;
+EXTRACTION TIPS:
+- Employee count: Look for "X employees", "team of Y", "Z staff members" Our team, our staff
+- Projects: Extract ALL mentioned (minimum 2 if available), can be case studies, in blogs or as long as they provided serives
+- Locations: Extract cities AND regions
+- Type: Infer from description if not explicit`;
 
-    // Call Claude API
-    console.log('[SCRAPER] Calling Claude API...');
+    console.log('[SCRAPER] Calling Claude API for extraction...');
     const message = await client.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 4000,
@@ -125,40 +130,23 @@ IMPORTANT EXTRACTION RULES:
       ]
     });
 
-    // Extract response
     const textBlock = message.content.find(block => block.type === 'text');
     if (!textBlock) {
       throw new Error('No text response from Claude');
     }
 
-    console.log('[SCRAPER] Got response from Claude');
-
-    // Parse JSON carefully
     let jsonText = textBlock.text.trim();
-    
-    // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     } else if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
 
-    let profileData;
-    try {
-      profileData = JSON.parse(jsonText);
-      console.log('[SCRAPER] Successfully parsed JSON');
-      console.log(`[SCRAPER] Projects: ${profileData.projects?.length || 0}, Locations: ${profileData.operatingLocations?.length || 0}`);
-    } catch (parseError) {
-      console.error('[SCRAPER] JSON parse error:', parseError.message);
-      console.error('[SCRAPER] Raw text:', jsonText.substring(0, 500));
-      return res.status(500).json({
-        error: 'Failed to parse Claude response as JSON',
-        rawResponse: jsonText.substring(0, 500)
-      });
-    }
-
-    // Enhance and validate data
+    let profileData = JSON.parse(jsonText);
     profileData = enhanceProfileData(profileData);
+
+    console.log('[SCRAPER] Extraction complete');
+    console.log(`[SCRAPER] Company Size: ${profileData.companySize}, Projects: ${profileData.projects.length}, Locations: ${profileData.operatingLocations.length}`);
 
     return res.status(200).json({
       success: true,
@@ -174,15 +162,51 @@ IMPORTANT EXTRACTION RULES:
   }
 }
 
-/**
- * Enhance profile data with additional processing
- */
+async function fetchAndClean(url) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      timeout: 8000
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    let html = await response.text();
+    
+    // Clean HTML
+    html = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
+      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return html.substring(0, 5000);
+  } catch (error) {
+    console.error(`[SCRAPER] Fetch error for ${url}:`, error.message);
+    return '';
+  }
+}
+
 function enhanceProfileData(data) {
-  // Ensure arrays exist
   if (!data.projects) data.projects = [];
   if (!data.operatingLocations) data.operatingLocations = [];
 
-  // Ensure we have at least basic location info
+  // Convert employee count to company size if needed
+  if (!data.companySize && data.employeeCount) {
+    const count = parseInt(data.employeeCount);
+    if (count < 20) data.companySize = 'Less than 20';
+    else if (count < 51) data.companySize = '21-50';
+    else if (count < 201) data.companySize = '51-200';
+    else if (count < 1001) data.companySize = '201-1000';
+    else data.companySize = 'More than 1000';
+  }
+
   if (data.operatingLocations.length === 0 && data.address) {
     const addressParts = data.address.split(',');
     if (addressParts.length >= 2) {
@@ -196,7 +220,6 @@ function enhanceProfileData(data) {
     }
   }
 
-  // Ensure all projects have required fields
   data.projects = data.projects.map(project => ({
     name: project.name || 'Unnamed Project',
     location: project.location || 'Location not specified',
@@ -205,12 +228,10 @@ function enhanceProfileData(data) {
     photos: Array.isArray(project.photos) ? project.photos.filter(p => p) : []
   }));
 
-  // Limit to 5 projects for form filling
   if (data.projects.length > 5) {
     data.projects = data.projects.slice(0, 5);
   }
 
-  // Limit to 10 locations
   if (data.operatingLocations.length > 10) {
     data.operatingLocations = data.operatingLocations.slice(0, 10);
   }
