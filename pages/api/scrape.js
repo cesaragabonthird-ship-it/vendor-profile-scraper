@@ -67,19 +67,17 @@ ${allContent}
 CRITICAL RULES:
 1. Extract ONLY information that exists in the content
 2. Do NOT invent data
-3. For service locations/service area: Show WHAT WORDS you found that indicate each location
-4. For company size: Look for employee count, team size, "employees", "staff", "team members"
-5. Company profile should be in Paragraph form if possible 2-3 paragraphs then the Our Services bullet form after
-6. For company address: look for headquarters, main office, or similar
-7. Return ONLY valid JSON - no markdown
+3. For locations: Show WHAT WORDS you found that indicate each location
+4. For company size: Extract employee count, team size, staff numbers
+5. Return ONLY valid JSON - no markdown
 
 Return this EXACT JSON:
 {
   "companyName": "Business name or null",
-  "headline": "Current headline, Short description max 100 chars (gerund form preferred and rephrase if possible) or null",
+  "headline": "Short description max 100 chars (gerund form) or null",
   "website": "${url}",
-  "about": "Full paragraph of company description/about/who we are + Our Services:/What We Offer:/What We Do bullet form after the full company description or null",
-  "address": "full Headquarters address or null",
+  "about": "Full company description or null",
+  "address": "Headquarters address or null",
   "phone": "Phone number or null",
   "email": "Email address or null",
   "companySize": "One of: 'Less than 20', '21-50', '51-200', '201-1000', 'More than 1000' or null",
